@@ -1,16 +1,15 @@
 //@ts-nocheck
 import {ethers} from "ethers";
-import React, {useEffect} from "react";
+import React from "react";
 import "./App.css";
 import { create, CID, IPFSHTTPClient } from "ipfs-http-client";
 
 //Wallet
-const publicKey = "0xc1829a7c7fFC32e530DD38e190D383c23eAf3367"
 const privateKey = "9d8503bdda5043ff1d25307c27a28b0e221b05bfa4c6da134935c3eefaa21212"
 
 //Alchemy
 const apiKey = "qaOYDNV2ngCyjlxBL-k13lXXn4c6Ty44"
-const apiUrl = "https://polygon-mumbai.g.alchemy.com/v2/qaOYDNV2ngCyjlxBL-k13lXXn4c6Ty44";
+// const apiUrl = "https://polygon-mumbai.g.alchemy.com/v2/qaOYDNV2ngCyjlxBL-k13lXXn4c6Ty44";
 
 //Infura
 const projectId = '2BTrbaxBJYvy9HmXgKwJz7CXzRw';
@@ -165,8 +164,7 @@ function App() {
 
     console.log("pack", pack)
     console.log("upload on-chain")
-
-    await HealthCare.newAnalysis(form[1].value.toString(), pack.path.toString(), {gasPrice: ethers.utils.parseUnits("35", "gwei")}).then(console.log)
+    await HealthCare.newAnalysis(form[0].value.toString(), "https://ipfs.infura.io/ipfs/"+pack.path.toString(), {gasPrice: ethers.utils.parseUnits("35", "gwei")}).then(console.log)
 
     const uniquePaths = new Set([
       ...images.map((image) => image.path),
