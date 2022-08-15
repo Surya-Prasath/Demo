@@ -3,6 +3,7 @@ import {ethers} from "ethers";
 import React from "react";
 import "./App.css";
 import { create, CID, IPFSHTTPClient } from "ipfs-http-client";
+import * as LitJsSdk from "lit-js-sdk";
 
 //Wallet
 const privateKey = "9d8503bdda5043ff1d25307c27a28b0e221b05bfa4c6da134935c3eefaa21212"
@@ -99,18 +100,55 @@ const abi = [
   }
 ]
 
+// lit protocol
+const client = new LitJsSdk.LitNodeClient();
+const chain = "mumbai"
+const standardContractType = "ERC20"
+
+const accessControlConditions = [
+  {
+      contractAddress: '',
+      standardContractType: '',
+      chain: 'ethereum',
+      method: 'eth_getBalance',
+      parameters: [':userAddress', 'latest'],
+      returnValueTest: {
+      comparator: '>=',
+      value: '0',  // 0 ETH, so anyone can open
+      },
+  },
+];
+
+
 function App() {
+  client.connect()
+  window.litNodeClient = client
+
+  var ipfs: IPFSHTTPClient | undefined;
+  try {
+    ipfs = create({
+      url: "https://ipfs.infura.io:5001/api/v0",
+      headers: {
+        authorization,
+      },
+    });
+  } catch (error) {
+    console.error("IPFS error ", error);
+    ipfs = undefined;
+  }
+
   const [images, setImages] = React.useState<{ cid: CID; path: string }[]>([]);
   const [title, setTitle] = React.useState("title")
   const [numpy, setNumpy] = React.useState("")
 
-    // Provider
+
+  // Provider
     const alchemyProvider = new ethers.providers.AlchemyProvider("maticmum", apiKey);
 
-// Signer
+  // Signer
     const signer = new ethers.Wallet(privateKey, alchemyProvider);
 
-// Contract
+  // Contract
     const HealthCare = new ethers.Contract(contractAddress, abi, signer);
 
   function set_title(event){
@@ -131,40 +169,13 @@ function App() {
     await HealthCare.analysed(title, numpy, {gasPrice: ethers.utils.parseUnits("35", "gwei")}).then(console.log)
   }
 
-  let ipfs: IPFSHTTPClient | undefined;
-  try {
-    ipfs = create({
-      url: "https://ipfs.infura.io:5001/api/v0",
-      headers: {
-        authorization,
-      },
-    });
-  } catch (error) {
-    console.error("IPFS error ", error);
-    ipfs = undefined;
-  }
+/**
+ * @description uploads the encrypted file to the ipfs
+ */
+  const uploadToIpfs = async (file: File)=>{
+    console.log("-----uploading-to-ipfs-----")
 
-  /**
-   * @description event handler that uploads the file selected by the user
-   */
-  const onSubmitHandler = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = event.target as HTMLFormElement;
-
-    const files = (form[2] as HTMLInputElement).files;
-
-    if (!files || files.length === 0) {
-      return alert("No files selected");
-    }
-
-    const file = files[0];
-    // upload files
     const result = await (ipfs as IPFSHTTPClient).add(file);
-    const pack = await(ipfs as IPFSHTTPClient).add(JSON.stringify({title: form[0].value, path: "https://ipfs.infura.io/ipfs/"+result.path, desc: form[1].value}))
-
-    console.log("pack", pack)
-    console.log("upload on-chain")
-    await HealthCare.newAnalysis(form[0].value.toString(), "https://ipfs.infura.io/ipfs/"+pack.path.toString(), {gasPrice: ethers.utils.parseUnits("35", "gwei")}).then(console.log)
 
     const uniquePaths = new Set([
       ...images.map((image) => image.path),
@@ -185,10 +196,186 @@ function App() {
     // @ts-ignore
     setImages(uniqueImages);
 
+    return result
+  }
+
+/**
+ * @description This encrypts the File
+ */
+  const encrypt = async(file: File)=>{
+    console.log("-----encrypting-----")
+    const authSig = await LitJsSdk.checkAndSignAuthMessage({chain})
+
+    const {encryptedFile, symmetricKey} = await LitJsSdk.encryptFile({file})
+    console.log(symmetricKey, "Symmetric Key")
+    console.log(encryptedFile, "Encrypted File")
+
+    const encryptedSymmetricKey = await client.saveEncryptionKey({
+      accessControlConditions,
+      symmetricKey,
+      authSig,
+      chain,
+      permanent: false
+  });
+    console.log(encryptedSymmetricKey, "Encrypted Symmetric Key")
+
+    return {encryptedFile:encryptedFile, encryptedSymmetricKey:encryptedSymmetricKey}
+  }
+
+  /**
+ * @description This decrypts the File
+ */
+  const decrypt = async(encryptedFile, encryptedSymmetricKey)=>{
+    console.log("-----decrypting-----")
+    const authSig = await LitJsSdk.checkAndSignAuthMessage({chain})
+
+    const toDecrypt = await LitJsSdk.uint8arrayToString(encryptedSymmetricKey, 'base16');
+    console.log(toDecrypt, "Encrypted Symmetric Key String")
+
+    
+    const _symmetricKey = await litNodeClient.getEncryptionKey({
+        accessControlConditions,
+        toDecrypt,
+        chain,
+        authSig
+    })
+    console.log(_symmetricKey, "Symmetric Key")
+
+    const file = await LitJsSdk.decryptFile({file: encryptedFile, symmetricKey: _symmetricKey})
+    console.log(file, "Decrypted File")
+
+    return file
+  }
+
+  const addViewers = async ()=>{
+
+  }
+
+  const removeViewers = async ()=>{
+
+  }
+
+  const readUrl = (url) => {
+    console.log("-----reading-url-----")
+
+    const xhr = new XMLHttpRequest();
+    xhr.responseType = "blob"
+    xhr.onload = async (event)=>{
+      console.log(xhr.response, "response")
+    }
+    xhr.open("GET", url)
+    xhr.send(null)
+  }
+  /**
+   * @description event handler that uploads the file selected by the user
+   */
+
+  const onSubmitHandler = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.target as HTMLFormElement;
+    const files = (form[2] as HTMLInputElement).files;
+
+    if (!files || files.length === 0) {
+      return alert("No files selected");
+    }
+
+    const file = files[0];
+
+    const {encryptedFile, encryptedSymmetricKey} = await encrypt(file)
+    console.log(encryptedFile, "Encrypted File")
+    
+    var location = (await uploadToIpfs(file)).path
+    location = "https://healthcare.infura-ipfs.io/ipfs/" + location
+    console.log(location, "location")
+
+    readUrl(location)
+
+    const originalFile = await decrypt(fileToDecrypt, encryptedSymmetricKey)
+    window.open(URL.createObjectURL(new Blob([originalFile], {type: "image/jpg"})))
+    // const pack = await(ipfs as IPFSHTTPClient).add(JSON.stringify({title: form[0].value, path: "https://healthcare.infura-ipfs.io/ipfs/"+result.path, desc: form[1].value}))
+    // console.log("pack", pack)
+    // await HealthCare.newAnalysis(form[0].value.toString(), "https://healthcare.infura-ipfs.io/ipfs/"+pack.path.toString(), {gasPrice: ethers.utils.parseUnits("35", "gwei")}).then(console.log)
+
     form.reset();
   };
 
   console.log("images ", images);
+
+   /**
+   * @description Extra options
+   */
+
+  const encryptZip = async (files)=>{
+    console.log("-----encrypting-zip-----")
+    const authSig = await LitJsSdk.checkAndSignAuthMessage({chain})
+
+    const {symmetricKey, encryptedZip} = await LitJsSdk.zipAndEncryptFiles(file)
+    console.log(symmetricKey, "Symmetric Key")
+    console.log(encryptedZip, "Encrypted Zip")
+
+    const encryptedSymmetricKey = await client.saveEncryptionKey({accessControlConditions, chain, authSig, symmetricKey, False})
+    console.log(encryptedSymmetricKey, "Encrypted Symmetric Key")
+
+    return {encryptedZip:encryptedZip, encryptedSymmetricKey:encryptedSymmetricKey}
+  }
+
+  const decryptZip = async(encryptedFile, encryptedSymmetricKey)=>{
+    console.log("-----decrypting-----")
+    const authSig = await LitJsSdk.checkAndSignAuthMessage({chain})
+
+    const toDecrypt = await LitJsSdk.uint8arrayToString(encryptedSymmetricKey, 'base16');
+    console.log(toDecrypt, "Encrypted Symmetric Key String")
+
+    // <Uint8Array(32)> _symmetricKey 
+    const _symmetricKey = await litNodeClient.getEncryptionKey({
+        accessControlConditions,
+        toDecrypt,
+        chain,
+        authSig
+    })
+    console.log(_symmetricKey, "Symmetric Key")
+
+    const file = await LitJsSdk.decryptZip(encryptedFile, _symmetricKey)
+    console.log(file, "Decrypted File")
+
+    return file
+  }
+
+  const encryptWithMetadata = async (file)=>{
+    console.log("-----encrypting-with-metadata-----")
+  
+    const authSig = await LitJsSdk.checkAndSignAuthMessage({chain})
+
+    const {zipBlob, encryptedSymmetricKey} = await LitJsSdk.encryptFileAndZipWithMetadata({authSig, accessControlConditions, chain, file, litNodeClient, description})
+    console.log(zipBlob, "Encrypted File")
+    console.log(encryptedSymmetricKey, "Encrypted Symmetric Key")
+
+    return {encryptedFile: zipBlob, encryptedSymmetricKey: encryptedSymmetricKey}
+
+  }
+
+  const decryptWithMetadata = async ()=>{
+    console.log("-----decrypting-with-metadata-----")
+
+    const authSig = await LitJsSdk.checkAndSignAuthMessage({chain})
+
+    const toDecrypt = await LitJsSdk.uint8arrayToString(encryptedSymmetricKey, 'base16');
+    console.log(toDecrypt, "Encrypted Symmetric Key String")
+
+    // <Uint8Array(32)> _symmetricKey 
+    const _symmetricKey = await litNodeClient.getEncryptionKey({
+        accessControlConditions,
+        toDecrypt,
+        chain,
+        authSig
+    })
+    console.log(_symmetricKey, "Symmetric Key")
+
+    await LitJsSdk.decryptZipFileWithMetadata({authSig, file: encryptedFile, litNodeClient: client}).then(hi=>console.log)
+    // console.log(file, "Decrypted File")
+
+    // return file
+  }
 
   return (
       <div className="App">
@@ -199,6 +386,7 @@ function App() {
                 <input onChange={set_numpy} placeholder={"numpy"} />
                 <button onClick={analysing}>Analysing</button>
                 <button onClick={analysed}>Analysed</button>
+                
                 <p>Upload File using IPFS</p>
 
                 <form onSubmit={onSubmitHandler}>
@@ -212,7 +400,7 @@ function App() {
                   {images.map((image, index) => (
                       <img
                           alt={`Uploaded #${index + 1}`}
-                          src={"https://ipfs.infura.io/ipfs/" + image.path}
+                          src={"https://healthcare.infura-ipfs.io/ipfs/" + image.path}
                           style={{ maxWidth: "400px", margin: "15px" }}
                           key={image.cid.toString() + index}
                       />

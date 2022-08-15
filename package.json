@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@alch/alchemy-web3": "^1.4.4",
+    "@nucypher/nucypher-core": "^0.2.0",
     "@testing-library/jest-dom": "^5.14.1",
     "@testing-library/react": "^13.0.0",
     "@testing-library/user-event": "^13.2.1",
@@ -13,6 +14,7 @@
     "@types/react-dom": "^18.0.0",
     "ethers": "^5.6.9",
     "ipfs-http-client": "^57.0.3",
+    "lit-js-sdk": "^1.1.209",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
