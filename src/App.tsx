@@ -18,106 +18,113 @@ const projectSecret = '6749ca1285e40bc118d22c1527941831';
 const authorization = "Basic " + btoa(projectId + ":" + projectSecret);
 
 //Contract
-const contractAddress = "0x705AA8A30F9aD6EdA4d230Fc4E4F39F48AA01E3e"
+const contractAddress = "0xEe3F106fB65951Be5cF70af195c0a6f65DdBf5Ee"
 const abi = [
-  {
-    "inputs": [],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "string",
-        "name": "title",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "numpy",
-        "type": "string"
-      }
-    ],
-    "name": "analysed",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "string",
-        "name": "title",
-        "type": "string"
-      }
-    ],
-    "name": "analysing",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      },
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "analysisInfo",
-    "outputs": [
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "string",
-        "name": "title",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "path",
-        "type": "string"
-      }
-    ],
-    "name": "newAnalysis",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "title",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "info",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "path",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "key",
+				"type": "string"
+			},
+			{
+				"internalType": "address",
+				"name": "sender",
+				"type": "address"
+			}
+		],
+		"name": "addAnalysis",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "analysisInfo",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"name": "authorizedPerson",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "title",
+				"type": "string"
+			}
+		],
+		"name": "verify",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
 ]
 
 // lit protocol
 const client = new LitJsSdk.LitNodeClient();
 const chain = "mumbai"
-const standardContractType = "ERC20"
-
-const accessControlConditions = [
-  {
-      contractAddress: '',
-      standardContractType: '',
-      chain: 'ethereum',
-      method: 'eth_getBalance',
-      parameters: [':userAddress', 'latest'],
-      returnValueTest: {
-      comparator: '>=',
-      value: '0',  // 0 ETH, so anyone can open
-      },
-  },
-];
 
 
 function App() {
@@ -140,6 +147,7 @@ function App() {
   const [images, setImages] = React.useState<{ cid: CID; path: string }[]>([]);
   const [title, setTitle] = React.useState("title")
   const [numpy, setNumpy] = React.useState("")
+  const [fileToDecrypt, setFileToDecrypt] = React.useState("")
 
 
   // Provider
@@ -202,7 +210,22 @@ function App() {
 /**
  * @description This encrypts the File
  */
-  const encrypt = async(file: File)=>{
+  const encrypt = async(file: File, title)=>{
+
+    const accessControlConditions = [
+      {
+        contractAddress: contractAddress,
+        standardContractType: "",
+        chain: chain,
+        method: "verify",
+        parameters: [title],
+        returnValueTest: {
+          comparator: "=",
+          value: "true"
+        }
+      }
+    ]
+
     console.log("-----encrypting-----")
     const authSig = await LitJsSdk.checkAndSignAuthMessage({chain})
 
@@ -220,12 +243,33 @@ function App() {
     console.log(encryptedSymmetricKey, "Encrypted Symmetric Key")
 
     return {encryptedFile:encryptedFile, encryptedSymmetricKey:encryptedSymmetricKey}
+ 
+    return file
   }
 
-  /**
+  const addViewers = async ()=>{
+
+  }
+
+ /**
  * @description This decrypts the File
  */
-  const decrypt = async(encryptedFile, encryptedSymmetricKey)=>{
+  const decrypt = async(encryptedFile, encryptedSymmetricKey, title)=>{
+
+    const accessControlConditions = [
+      {
+        contractAddress: contractAddress,
+        standardContractType: "",
+        chain: chain,
+        method: "verify",
+        parameters: ["surya"],
+        returnValueTest: {
+          comparator: "=",
+          value: "true"
+        }
+      }
+    ]
+
     console.log("-----decrypting-----")
     const authSig = await LitJsSdk.checkAndSignAuthMessage({chain})
 
@@ -243,16 +287,6 @@ function App() {
 
     const file = await LitJsSdk.decryptFile({file: encryptedFile, symmetricKey: _symmetricKey})
     console.log(file, "Decrypted File")
-
-    return file
-  }
-
-  const addViewers = async ()=>{
-
-  }
-
-  const removeViewers = async ()=>{
-
   }
 
   const readUrl = (url) => {
@@ -260,12 +294,14 @@ function App() {
 
     const xhr = new XMLHttpRequest();
     xhr.responseType = "blob"
-    xhr.onload = async (event)=>{
-      console.log(xhr.response, "response")
+    xhr.onload = (event)=>{
+      setFileToDecrypt(()=>xhr.response)
+      console.log(fileToDecrypt, "File to Decrypt")
     }
     xhr.open("GET", url)
     xhr.send(null)
   }
+
   /**
    * @description event handler that uploads the file selected by the user
    */
@@ -281,18 +317,23 @@ function App() {
 
     const file = files[0];
 
-    const {encryptedFile, encryptedSymmetricKey} = await encrypt(file)
+    const {encryptedFile, encryptedSymmetricKey} = await encrypt(file, form[0].value.toString())  
     console.log(encryptedFile, "Encrypted File")
     
     var location = (await uploadToIpfs(file)).path
     location = "https://healthcare.infura-ipfs.io/ipfs/" + location
     console.log(location, "location")
+    
+    await HealthCare.addAnalysis(form[0].value.toString(), form[1].value.toString(), location.toString(), encryptedSymmetricKey.toString(), "0x577D412b4Bc042A37Ba0fb36888485047295dd84", {gasPrice: ethers.utils.parseUnits("35", "gwei")}).then(console.log)
 
-    readUrl(location)
+    // readUrl(location)
+    // console.log(fileToDecrypt, "File to Decrypt")
 
-    const originalFile = await decrypt(fileToDecrypt, encryptedSymmetricKey)
-    window.open(URL.createObjectURL(new Blob([originalFile], {type: "image/jpg"})))
-    // const pack = await(ipfs as IPFSHTTPClient).add(JSON.stringify({title: form[0].value, path: "https://healthcare.infura-ipfs.io/ipfs/"+result.path, desc: form[1].value}))
+
+    await decrypt(encryptedFile, enSymKey, form[0].value.toString()).then((originalFile)=>window.open(URL.createObjectURL(new Blob([originalFile], {type: "image/jpg"}))))   
+  
+
+     // const pack = await(ipfs as IPFSHTTPClient).add(JSON.stringify({title: form[0].value, path: "https://healthcare.infura-ipfs.io/ipfs/"+result.path, desc: form[1].value}))
     // console.log("pack", pack)
     // await HealthCare.newAnalysis(form[0].value.toString(), "https://healthcare.infura-ipfs.io/ipfs/"+pack.path.toString(), {gasPrice: ethers.utils.parseUnits("35", "gwei")}).then(console.log)
 
@@ -408,6 +449,7 @@ function App() {
                 </div>
               </>
           )}
+          
 
           {!ipfs && (
               <p>Oh oh, Not connected to IPFS. Checkout out the logs for errors</p>

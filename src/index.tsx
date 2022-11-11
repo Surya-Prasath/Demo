@@ -2,6 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import Sender from './components/sender';
+import Receiver from './components/receiver'; 
+import {BrowserRouter, Route, Routes} from 'react-router-dom'; 
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(
@@ -9,7 +12,12 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+    <Routes>
+      <Route path="/sender" element={<Sender />} />
+      <Route path="/receiver" element={<Receiver />} />
+    </Routes>
+    </BrowserRouter>
   </React.StrictMode>
 );
 
